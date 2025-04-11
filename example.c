@@ -2,7 +2,6 @@
 #include <windows.h>
 #include <stdio.h>
 
-#define SYSCALL_IMPLEMENTATION
 #include "syscall.h"
 
 typedef struct _CLIENT_ID
@@ -63,7 +62,6 @@ int main(int argc, char *argv[]) {
   
   LPVOID lpNtOpenProcess           = GetProcAddress(hNtdll, "NtOpenProcess");
   LPVOID lpNtAllocateVirtualMemory = GetProcAddress(hNtdll, "NtAllocateVirtualMemory");
-  LPVOID lpNtProtectVirtualMemory  = GetProcAddress(hNtdll, "NtProtectVirtualMemory");
   LPVOID lpNtWriteVirtualMemory    = GetProcAddress(hNtdll, "NtWriteVirtualMemory");
   LPVOID lpNtCreateThreadEx        = GetProcAddress(hNtdll, "NtCreateThreadEx");
 

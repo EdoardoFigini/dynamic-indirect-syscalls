@@ -1,19 +1,22 @@
 CC = gcc
-CFLAGS = 
+CFLAGS = -Wall -Wextra -ggdb
 
 ifneq ($(OS),Windows_NT)
 	CC = x86_64-w64-mingw32-gcc
 	CFLAGS += -DWINE
 endif
 
-example: example.obj syscall.obj
-	$(CC) -o example.exe example.obj syscall.obj
+example: example.obj syscall.c.obj syscall.asm.obj
+	$(CC) -o example.exe example.obj syscall.c.obj syscall.asm.obj
 
 example.obj: example.c syscall.h
-	$(CC) $(CFLAGS) -ggdb -o example.obj -c example.c
+	$(CC) $(CFLAGS) -o example.obj -c example.c
 
-syscall.obj: syscall.asm
-	nasm -f win64 syscall.asm
+syscall.c.obj: syscall.c syscall.h
+	$(CC) $(CFLAGS) -o syscall.c.obj -c syscall.c
+
+syscall.asm.obj: syscall.asm
+	nasm -f win64 -o syscall.asm.obj syscall.asm 
 
 clean:
 	rm *.obj
