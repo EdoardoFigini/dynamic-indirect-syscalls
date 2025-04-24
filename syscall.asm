@@ -25,7 +25,9 @@ Syscall:
   mov rdx, r8
   mov r8,  r9
   mov r9, qword [rsp+28h]
-  mov [rsp+28h], rbx ; "push" rbx 
+  ; "push" rbx (overwrite the useless parameter originally 
+  ; on the stack since now it's in r9) 
+  mov [rsp+28h], rbx 
   ; store the return address in rbx cause we are 
   ; advancing the stack pointer and syscall might 
   ; overwrite the 8 bytes containing the original 
@@ -34,8 +36,17 @@ Syscall:
   ; adjust rsp to discard 5th argument in the stack:
   ; the syscall will pop from rsp+0x28, finding the 
   ; 6th argument
+  ; NOTE: rsp is increased by 16 instead of 8 since
+  ; the call to indirect address will push the current
+  ; rip onto the stack
   add rsp, 10h
 
+  ; need to call instead of jump because the next 
+  ; three instructions must be executed to restore
+  ; the execution environment of the process.
+  ; jumping into ntdll would return to the caller
+  ; of the Syscall function (or straight up crash 
+  ; attempting to return).
   call qword [g_lpSyscallAddr]
   
   sub rsp, 10h ; restore rsp
