@@ -9,6 +9,7 @@ DWORD GetSSN(LPVOID lpFuncAddr) {
   g_lpSyscallAddr = (LPVOID)((DWORD_PTR)lpFuncAddr + 24); 
   return *(DWORD*)((DWORD_PTR)lpFuncAddr + 0x04L);
 #else
+  if (*((BYTE*)lpFuncAddr + 0x03) != 0xB8) return 0; // check for the presence of mov eax
   DWORD dwSSN = *(DWORD*)((DWORD_PTR)lpFuncAddr + 0x04L); 
   LPVOID lpSyscallAddr = (LPVOID)((DWORD_PTR)lpFuncAddr + 0x12L); 
   if (*(BYTE*)lpSyscallAddr != 0x0F || *(BYTE*)(lpSyscallAddr + 1) != 0x05) {
