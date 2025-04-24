@@ -13,7 +13,7 @@ Syscall:
   ; return status. Otherwise perform a jump to the end
   ; of the function
   mov rax, 0xC000001C
-  jrcxz _exit
+  jrcxz .exit
   ; shift registers
   ; ecx   -> eax (ssn is in the 1st arg)
   ; rdx   -> r10 (1st arg of syscalls is expected in r10)
@@ -41,5 +41,5 @@ Syscall:
   sub rsp, 10h ; restore rsp
   mov [rsp], rbx ; restore return address
   mov rbx, [rsp+28h] ; restore rbx
-_exit:
+  .exit:
   ret
